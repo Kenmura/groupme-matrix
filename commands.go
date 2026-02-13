@@ -128,6 +128,10 @@ func fnPing(ce *WrappedCommandEvent) {
 		ce.Reply("You are not connected to GroupMe.")
 		return
 	}
+	if ce.User.Client == nil {
+		ce.Reply("You are not logged in to GroupMe.")
+		return
+	}
 
 	start := time.Now()
 	_, err := ce.User.Client.MyUser(context.Background())

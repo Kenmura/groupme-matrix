@@ -33,3 +33,16 @@ func (user *User) MarkInSpace(portal PortalKey) {
 		user.inSpaceCache[portal] = true
 	}
 }
+
+func (user *User) SetPortalKeys(keys []PortalKeyWithMeta) error {
+	// This function acts as a bulk update or initialization of portal keys for the user.
+	// Since MarkInSpace handles individual updates, this could be used for
+	// optimizing bulk operations if needed, or simply iterating and calling MarkInSpace.
+	// For now, we'll iterate.
+	for _, key := range keys {
+		if key.InCommunity {
+			user.MarkInSpace(key.PortalKey)
+		}
+	}
+	return nil
+}

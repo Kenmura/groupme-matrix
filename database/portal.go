@@ -36,6 +36,11 @@ type PortalKey struct {
 	Receiver groupme.ID
 }
 
+type PortalKeyWithMeta struct {
+	PortalKey
+	InCommunity bool
+}
+
 func ParsePortalKey(inp string) *PortalKey {
 	parts := strings.Split(inp, "+")
 
