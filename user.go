@@ -341,8 +341,10 @@ func (user *User) Connect() bool {
 	if timeout == 0 {
 		timeout = 20
 	}
+	user.log.Debugfln("Connecting to GroupMe with timeout %v", timeout)
 	conn := groupme.NewPushSubscription(context.Background())
 	user.Conn = &conn
+	user.log.Debugln("Starting listening on PushSubscription")
 	user.Conn.StartListening(context.Background(), groupmeext.NewFayeClient(user.log))
 	user.Conn.AddFullHandler(user)
 
@@ -399,13 +401,16 @@ func (user *User) GetGMID() groupme.ID {
 }
 
 func (user *User) Login(token string) error {
+	user.log.Debugfln("Logging in with token: %s...", token[:5])
 	user.Token = token
 
 	user.addToGMIDMap()
 	user.PostLogin()
 	if user.Connect() {
+		user.log.Debugln("Login successful")
 		return nil
 	}
+	user.log.Warnln("Login failed: failed to connect")
 	return errors.New("failed to connect")
 }
 
@@ -434,7 +439,7 @@ func (user *User) PostLogin() {
 	user.bridge.Metrics.TrackConnectionState(user.GMID, true)
 	user.bridge.Metrics.TrackLoginState(user.GMID, true)
 	user.bridge.Metrics.TrackBufferLength(user.MXID, 0)
-	// go user.intPostLogin()
+	go user.intPostLogin()
 }
 
 func (user *User) tryAutomaticDoublePuppeting() {
@@ -502,46 +507,47 @@ func (user *User) postConnPing() bool {
 	return true
 }
 
-// func (user *User) intPostLogin() {
-// 	defer user.syncWait.Done()
-// 	user.lastReconnection = time.Now().Unix()
-// 	user.Client = groupmeext.NewClient(user.Token)
-// 	if len(user.JID) == 0 {
-// 		myuser, err := user.Client.MyUser(context.TODO())
-// 		if err != nil {
-// 			log.Fatal(err) //TODO
-// 		}
-// 		user.JID = myuser.ID.String()
-// 	}
-// 	user.Update()
+func (user *User) intPostLogin() {
+	// defer user.syncWait.Done()
+	user.lastReconnection = time.Now().Unix()
+	user.Client = groupmeext.NewClient(user.Token, user.log)
+	if len(user.GMID) == 0 {
+		myuser, err := user.Client.MyUser(context.TODO())
+		if err != nil {
+			user.log.Errorln("Failed to get own user info:", err) //TODO
+		} else {
+			user.GMID = myuser.ID
+		}
+	}
+	user.Update()
 
-// 	user.tryAutomaticDoublePuppeting()
+	user.tryAutomaticDoublePuppeting()
 
-// 	user.log.Debugln("Waiting for chat list receive confirmation")
-// 	user.HandleChatList()
-// 	select {
-// 	case <-user.chatListReceived:
-// 		user.log.Debugln("Chat list receive confirmation received in PostLogin")
-// 	case <-time.After(time.Duration(user.bridge.Config.Bridge.ChatListWait) * time.Second):
-// 		user.log.Warnln("Timed out waiting for chat list to arrive!")
-// 		user.postConnPing()
-// 		return
-// 	}
+	user.log.Debugln("Waiting for chat list receive confirmation")
+	user.HandleChatList()
+	select {
+	case <-user.chatListReceived:
+		user.log.Debugln("Chat list receive confirmation received in PostLogin")
+	case <-time.After(time.Duration(user.bridge.Config.Bridge.ChatListWait) * time.Second):
+		user.log.Warnln("Timed out waiting for chat list to arrive!")
+		user.postConnPing()
+		return
+	}
 
-// 	if !user.postConnPing() {
-// 		user.log.Debugln("Post-connection ping failed, unlocking processing of incoming messages.")
-// 		return
-// 	}
+	if !user.postConnPing() {
+		user.log.Debugln("Post-connection ping failed, unlocking processing of incoming messages.")
+		return
+	}
 
-// 	user.log.Debugln("Waiting for portal sync complete confirmation")
-// 	select {
-// 	case <-user.syncPortalsDone:
-// 		user.log.Debugln("Post-connection portal sync complete, unlocking processing of incoming messages.")
-// 	// TODO this is too short, maybe a per-portal duration?
-// 	case <-time.After(time.Duration(user.bridge.Config.Bridge.PortalSyncWait) * time.Second):
-// 		user.log.Warnln("Timed out waiting for portal sync to complete! Unlocking processing of incoming messages.")
-// 	}
-// }
+	user.log.Debugln("Waiting for portal sync complete confirmation")
+	select {
+	case <-user.syncPortalsDone:
+		user.log.Debugln("Post-connection portal sync complete, unlocking processing of incoming messages.")
+	// TODO this is too short, maybe a per-portal duration?
+	case <-time.After(time.Duration(user.bridge.Config.Bridge.PortalSyncWait) * time.Second):
+		user.log.Warnln("Timed out waiting for portal sync to complete! Unlocking processing of incoming messages.")
+	}
+}
 
 func (user *User) HandleChatList() {
 	chatMap := map[groupme.ID]groupme.Group{}

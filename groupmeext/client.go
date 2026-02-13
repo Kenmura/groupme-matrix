@@ -4,34 +4,49 @@ import (
 	"context"
 
 	"github.com/beeper/groupme-lib"
+	log "maunium.net/go/maulogger/v2"
 )
 
 type Client struct {
 	*groupme.Client
+	log log.Logger
 }
 
 // NewClient creates a new GroupMe API Client
-func NewClient(authToken string) *Client {
+func NewClient(authToken string, log log.Logger) *Client {
 	n := Client{
 		Client: groupme.NewClient(authToken),
+		log:    log,
 	}
 	return &n
 }
 func (c Client) IndexAllGroups() ([]*groupme.Group, error) {
-	return c.IndexGroups(context.TODO(), &groupme.GroupsQuery{
+	groups, err := c.IndexGroups(context.TODO(), &groupme.GroupsQuery{
 		//	Omit:    "memberships",
 		PerPage: 100, //TODO: Configurable and add multipage support
 	})
+	if err != nil {
+		c.log.Warnln("Failed to index groups:", err)
+	}
+	return groups, err
 }
 
 func (c Client) IndexAllRelations() ([]*groupme.User, error) {
-	return c.IndexRelations(context.TODO())
+	users, err := c.IndexRelations(context.TODO())
+	if err != nil {
+		c.log.Warnln("Failed to index relations:", err)
+	}
+	return users, err
 }
 
 func (c Client) IndexAllChats() ([]*groupme.Chat, error) {
-	return c.IndexChats(context.TODO(), &groupme.IndexChatsQuery{
+	chats, err := c.IndexChats(context.TODO(), &groupme.IndexChatsQuery{
 		PerPage: 100, //TODO?
 	})
+	if err != nil {
+		c.log.Warnln("Failed to index chats:", err)
+	}
+	return chats, err
 }
 
 func (c Client) LoadMessagesAfter(groupID groupme.ID, lastMessageID string, lastMessageFromMe bool, private bool) ([]*groupme.Message, error) {

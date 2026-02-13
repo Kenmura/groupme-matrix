@@ -427,24 +427,13 @@ func (portal *Portal) UpdateAvatar(user *User, avatar string, updateInfo bool) b
 	}
 
 	//TODO check its actually groupme?
-	response, err := http.Get(avatar + ".large")
+	imgData, mime, err := groupmeext.DownloadImage(avatar+".large", portal.log)
 	if err != nil {
 		portal.log.Warnln("Failed to download avatar:", err)
 		return false
 	}
-	defer response.Body.Close()
 
-	image, err := ioutil.ReadAll(response.Body)
-	if err != nil {
-		portal.log.Warnln("Failed to read downloaded avatar:", err)
-		return false
-	}
-
-	mime := response.Header.Get("Content-Type")
-	if len(mime) == 0 {
-		mime = http.DetectContentType(image)
-	}
-	resp, err := portal.MainIntent().UploadBytes(image, mime)
+	resp, err := portal.MainIntent().UploadBytes(*imgData, mime)
 	if err != nil {
 		portal.log.Warnln("Failed to upload avatar:", err)
 		return false
@@ -952,7 +941,7 @@ func (portal *Portal) handleAttachment(intent *appservice.IntentAPI, attachment 
 	sendText = true
 	switch attachment.Type {
 	case "image":
-		imgData, mime, err := groupmeext.DownloadImage(attachment.URL)
+		imgData, mime, err := groupmeext.DownloadImage(attachment.URL, portal.log)
 		if err != nil {
 			return nil, true, fmt.Errorf("failed to load media info: %w", err)
 		}
@@ -1006,7 +995,10 @@ func (portal *Portal) handleAttachment(intent *appservice.IntentAPI, attachment 
 
 		return content, true, nil
 	case "video":
-		vidContents, mime := groupmeext.DownloadVideo(attachment.VideoPreviewURL, attachment.URL, source.Token)
+		vidContents, mime, err := groupmeext.DownloadVideo(attachment.VideoPreviewURL, attachment.URL, source.Token, portal.log)
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to download video: %w", err)
+		}
 		if mime == "" {
 			mime = mimetype.Detect(vidContents).String()
 		}
@@ -1046,7 +1038,10 @@ func (portal *Portal) handleAttachment(intent *appservice.IntentAPI, attachment 
 		message.Text = strings.Replace(message.Text, attachment.URL, "", 1)
 		return content, true, nil
 	case "file":
-		fileData, fname, fmime := groupmeext.DownloadFile(portal.Key.GMID, attachment.FileID, source.Token)
+		fileData, fname, fmime, err := groupmeext.DownloadFile(portal.Key.GMID, attachment.FileID, source.Token, portal.log)
+		if err != nil {
+			return nil, true, fmt.Errorf("failed to download file: %w", err)
+		}
 		if fmime == "" {
 			fmime = mimetype.Detect(fileData).String()
 		}

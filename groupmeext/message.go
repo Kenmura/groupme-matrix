@@ -10,6 +10,7 @@ import (
 	"net/http"
 
 	"github.com/beeper/groupme-lib"
+	log "maunium.net/go/maulogger/v2"
 )
 
 type Message struct{ groupme.Message }
@@ -37,10 +38,11 @@ func (m *Message) Value() (driver.Value, error) {
 
 // DownloadImage helper function to download image from groupme;
 // append .large/.preview/.avatar to get various sizes
-func DownloadImage(URL string) (bytes *[]byte, mime string, err error) {
+func DownloadImage(URL string, log log.Logger) (bytes *[]byte, mime string, err error) {
 	//TODO check its actually groupme?
 	response, err := http.Get(URL)
 	if err != nil {
+		log.Errorln("Failed to download image:", err)
 		return nil, "", errors.New("Failed to download avatar: " + err.Error())
 	}
 	defer response.Body.Close()
@@ -48,6 +50,7 @@ func DownloadImage(URL string) (bytes *[]byte, mime string, err error) {
 	image, err := ioutil.ReadAll(response.Body)
 	bytes = &image
 	if err != nil {
+		log.Errorln("Failed to read image body:", err)
 		return nil, "", errors.New("Failed to read downloaded image:" + err.Error())
 	}
 
@@ -58,7 +61,7 @@ func DownloadImage(URL string) (bytes *[]byte, mime string, err error) {
 	return
 }
 
-func DownloadFile(RoomJID groupme.ID, FileID string, token string) (contents []byte, fname, mime string) {
+func DownloadFile(RoomJID groupme.ID, FileID string, token string, log log.Logger) (contents []byte, fname, mime string, err error) {
 	client := &http.Client{}
 	b, _ := json.Marshal(struct {
 		FileIDS []string `json:"file_ids"`
@@ -71,16 +74,17 @@ func DownloadFile(RoomJID groupme.ID, FileID string, token string) (contents []b
 	req.Header.Add("Content-Type", "application/json")
 	resp, err := client.Do(req)
 	if err != nil {
-		// TODO: FIX
-		panic(err)
+		log.Errorln("Failed to get file data:", err)
+		return nil, "", "", err
 	}
 
 	defer resp.Body.Close()
 	data := []ImgData{}
 	json.NewDecoder(resp.Body).Decode(&data)
-	fmt.Println(data, RoomJID, FileID, token)
+	// fmt.Println(data, RoomJID, FileID, token)
 	if len(data) < 1 {
-		return
+		log.Warnln("No file data found for", FileID)
+		return nil, "", "", errors.New("no file data found")
 	}
 
 	req, _ = http.NewRequest("POST", fmt.Sprintf("https://file.groupme.com/v1/%s/files/%s", RoomJID, FileID), nil)
@@ -88,17 +92,16 @@ func DownloadFile(RoomJID groupme.ID, FileID string, token string) (contents []b
 	req.Header.Add("X-Access-Token", token)
 	resp, err = client.Do(req)
 	if err != nil {
-		// TODO: FIX
-		panic(err)
+		log.Errorln("Failed to download file:", err)
+		return nil, "", "", err
 	}
 	defer resp.Body.Close()
 
 	bytes, _ := ioutil.ReadAll(resp.Body)
-	return bytes, data[0].FileData.FileName, data[0].FileData.Mime
-
+	return bytes, data[0].FileData.FileName, data[0].FileData.Mime, nil
 }
 
-func DownloadVideo(previewURL, videoURL, token string) (vidContents []byte, mime string) {
+func DownloadVideo(previewURL, videoURL, token string, log log.Logger) (vidContents []byte, mime string, err error) {
 	//preview TODO
 	client := &http.Client{}
 
@@ -106,17 +109,21 @@ func DownloadVideo(previewURL, videoURL, token string) (vidContents []byte, mime
 	req.AddCookie(&http.Cookie{Name: "token", Value: token})
 	resp, err := client.Do(req)
 	if err != nil {
-		fmt.Println(err)
-		return nil, ""
+		log.Errorln("Failed to download video:", err)
+		return nil, "", err
 	}
 	defer resp.Body.Close()
+
+	if resp.StatusCode != 200 {
+		return nil, "", fmt.Errorf("failed to download video: status %d", resp.StatusCode)
+	}
 
 	bytes, _ := ioutil.ReadAll(resp.Body)
 	mime = resp.Header.Get("Content-Type")
 	if len(mime) == 0 {
 		mime = http.DetectContentType(bytes)
 	}
-	return bytes, mime
+	return bytes, mime, nil
 
 }
 

@@ -14,3 +14,4 @@ groupme
 *.yaml
 !.pre-commit-config.yaml
 !example-config.yaml
+main.exe
