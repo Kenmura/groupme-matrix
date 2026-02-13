@@ -528,7 +528,7 @@ func (user *User) intPostLogin() {
 	select {
 	case <-user.chatListReceived:
 		user.log.Debugln("Chat list receive confirmation received in PostLogin")
-	case <-time.After(time.Duration(user.bridge.Config.Bridge.ChatListWait) * time.Second):
+	case <-time.After(30 * time.Second):
 		user.log.Warnln("Timed out waiting for chat list to arrive!")
 		user.postConnPing()
 		return
@@ -544,7 +544,7 @@ func (user *User) intPostLogin() {
 	case <-user.syncPortalsDone:
 		user.log.Debugln("Post-connection portal sync complete, unlocking processing of incoming messages.")
 	// TODO this is too short, maybe a per-portal duration?
-	case <-time.After(time.Duration(user.bridge.Config.Bridge.PortalSyncWait) * time.Second):
+	case <-time.After(30 * time.Second):
 		user.log.Warnln("Timed out waiting for portal sync to complete! Unlocking processing of incoming messages.")
 	}
 }

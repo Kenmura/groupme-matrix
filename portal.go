@@ -22,7 +22,6 @@ import (
 	"errors"
 	"fmt"
 	"image"
-	"io/ioutil"
 	"math"
 	"net/http"
 	"net/url"

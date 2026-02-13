@@ -8,4 +8,23 @@ Matrix room: [#groupme-go-bridge:malhotra.cc](https://matrix.to/#/#groupme-go-br
 
 ## Credits
 
-Forked from https://github.com/karmanyaahm/matrix-groupme-go which was archived.
+
+## Build Instructions
+
+### Windows
+
+To build on Windows (or systems without libolm), use the `nocrypto` tag:
+
+```powershell
+go build -tags nocrypto .
+```
+
+This will produce `groupme.exe`.
+
+### Linux/macOS
+
+If you have libolm installed:
+
+```bash
+go build .
+```

@@ -208,5 +208,50 @@ func main() {
 		}
 	}
 
+	fmt.Println("------------------------------------------------")
+	fmt.Println("Fetching most recent DMs (Chats)...")
+	dms, err := client.IndexChats(context.Background(), &groupme.IndexChatsQuery{
+		PerPage: 5,
+	})
+	if err != nil {
+		fmt.Println("Failed to fetch DMs:", err)
+	} else {
+		fmt.Printf("Found %d DMs. Processing...\n", len(dms))
+		for i, dm := range dms {
+			if i >= 5 {
+				break
+			}
+			fmt.Printf("Processing DM %d/%d: With %s (ID: %s)\n", i+1, len(dms), dm.OtherUser.Name, dm.OtherUser.ID)
+
+			// Fetch messages for DM
+			// DMs might use IndexDirectMessages or similar?
+			// client.go uses IndexDirectMessages for LoadMessagesAfter/Before in private mode.
+			// Let's verify that.
+			// Ideally we use what the bridge uses.
+			// The bridge uses client.LoadMessagesBefore/After with private=true, which calls IndexDirectMessages.
+			// We can try IndexDirectMessages here.
+
+			msgs, err := client.IndexDirectMessages(context.Background(), dm.OtherUser.ID.String(), &groupme.IndexDirectMessagesQuery{
+				// Limit not supported?
+			})
+			if err != nil {
+				fmt.Println("Failed to fetch messages for DM:", err)
+				continue
+			}
+
+			fmt.Printf("  Fetched %d messages:\n", len(msgs.Messages))
+			for _, msg := range msgs.Messages {
+				text := msg.Text
+				if text == "" {
+					text = "[No Text/Media]"
+				}
+				if len(text) > 50 {
+					text = text[:47] + "..."
+				}
+				fmt.Printf("    - [%s] %s: %s\n", msg.ID, msg.Name, text)
+			}
+		}
+	}
+
 	fmt.Println("Done.")
 }
