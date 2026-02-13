@@ -17,6 +17,9 @@
 package main
 
 import (
+	"context"
+	"time"
+
 	"maunium.net/go/mautrix/bridge/commands"
 )
 
@@ -58,21 +61,22 @@ func (br *GMBridge) RegisterCommands() {
 		// cmdAccept,
 		// cmdCreate,
 		cmdLogin,
-	// cmdLogout,
-	// cmdTogglePresence,
-	// cmdDeleteSession,
-	// cmdReconnect,
-	// cmdDisconnect,
-	// cmdPing,
-	// cmdDeletePortal,
-	// cmdDeleteAllPortals,
-	// cmdBackfill,
-	// cmdList,
-	// cmdSearch,
-	// cmdOpen,
-	// cmdPM,
-	// cmdSync,
-	// cmdDisappearingTimer,
+		// cmdLogout,
+		// cmdTogglePresence,
+		// cmdDeleteSession,
+		// cmdReconnect,
+		// cmdDisconnect,
+		// cmdDisconnect,
+		cmdPing,
+		// cmdDeletePortal,
+		// cmdDeleteAllPortals,
+		// cmdBackfill,
+		// cmdList,
+		// cmdSearch,
+		// cmdOpen,
+		// cmdPM,
+		cmdSync,
+		// cmdDisappearingTimer,
 	)
 }
 
@@ -108,4 +112,48 @@ func fnLogin(ce *WrappedCommandEvent) {
 	}
 
 	ce.Reply("Logged in successfully!")
+}
+
+var cmdPing = &commands.FullHandler{
+	Func: wrapCommand(fnPing),
+	Name: "ping",
+	Help: commands.HelpMeta{
+		Section:     HelpSectionConnectionManagement,
+		Description: "Check the connection to GroupMe.",
+	},
+}
+
+func fnPing(ce *WrappedCommandEvent) {
+	if !ce.User.IsConnected() {
+		ce.Reply("You are not connected to GroupMe.")
+		return
+	}
+
+	start := time.Now()
+	_, err := ce.User.Client.MyUser(context.Background())
+	if err != nil {
+		ce.Reply("Ping failed: %v", err)
+		return
+	}
+	duration := time.Since(start)
+	ce.Reply("Pong! (GP API ping: %s)", duration)
+}
+
+var cmdSync = &commands.FullHandler{
+	Func: wrapCommand(fnSync),
+	Name: "sync",
+	Help: commands.HelpMeta{
+		Section:     HelpSectionMiscellaneous,
+		Description: "Force a sync of chats from GroupMe.",
+	},
+}
+
+func fnSync(ce *WrappedCommandEvent) {
+	if !ce.User.IsConnected() {
+		ce.Reply("You are not connected to GroupMe.")
+		return
+	}
+
+	ce.Reply("Sync started...")
+	go ce.User.HandleChatList()
 }
